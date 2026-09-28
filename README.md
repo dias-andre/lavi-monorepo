@@ -8,92 +8,66 @@
 
 ![Maintainer](https://img.shields.io/badge/maintainer-https--dre-blue)
 
-## Sobre o Projeto
+> **Projeto arquivado.** Este repositório foi desenvolvido como trabalho de conclusão de curso e não recebe manutenção regular. O código contém bugs e lacunas conhecidos; não considere o sistema pronto para produção nem use dados ou credenciais reais sem uma revisão técnica e de segurança.
 
-A **Laví API** é o backend responsável por gerenciar os workflows e as regras de negócio do aplicativo "Laví". Construída com foco em performance e escalabilidade, utilizando um stack moderno com Elysia, Bun e TypeScript.
+## Sobre o projeto
 
-### Pré-requisitos
+A **Laví API** é o backend de uma plataforma de lavanderias. O repositório é um monorepo com uma API HTTP, um serviço de comunicação em tempo real e um worker planejado. A API reúne fluxos de clientes, lavanderias, pedidos, catálogo, avaliações, notificações e conversas.
 
-Antes de começar, você vai precisar ter as seguintes ferramentas instaladas:
+O código usa Bun e TypeScript. A API HTTP foi construída com Elysia e Drizzle ORM, com PostgreSQL para persistência, Redis para eventos e filas e AWS S3 para arquivos. O serviço em tempo real usa Socket.IO.
 
-  * [Bun](https://bun.sh/) (v1.2 ou superior)
-  * [Docker](https://www.docker.com/get-started) e [Docker Compose](https://docs.docker.com/compose/install/)
+## Estado atual e limitações
 
-## Instalação
+- A API tem implementação para os principais módulos do domínio, mas há poucos testes automatizados no repositório e eles não cobrem os fluxos completos.
+- `worker` ainda é um scaffold: seu ponto de entrada só imprime uma mensagem. Existe um consumidor Redis separado, mas não é iniciado pelo ponto de entrada e sua tarefa atual é apenas ilustrativa.
+- A configuração local de Docker Compose prepara API, realtime, PostgreSQL, Redis e migrações com valores de desenvolvimento. Não há uma composição de produção mantida; o workflow antigo de deploy precisa de revisão.
+- Recursos de upload para S3 não funcionam com os placeholders locais: precisam de credenciais AWS e bucket configurado.
+- A action de deploy parece ter caminhos e nomes de repositório antigos e não deve ser considerada uma implantação funcional sem revisão.
 
-1.  **Clone o repositório:**
+Esses pontos são um retrato do código encontrado, não uma lista exaustiva de defeitos. Consulte [a documentação da arquitetura e operação](docs/ARQUITETURA.md) para detalhes e para entender cada parte do monorepo.
 
-    ```sh
-    git clone https://github.com/laundry-lavi/lavi-api.git
-    cd lavi-api
-    ```
+## Estrutura do repositório
 
-### Executando a Aplicação
-
-1.  **Iniciar a aplicação com suas dependências**
-
-    Este comando executa a criação dos containers em modo de produção, copiando as variáveis do arquivo '.env'
-
-    ```sh
-    bash ci/start.sh
-    ```
-
-A API estará disponível em `http://localhost:{PORT}`, onde `{PORT}` é a porta que você definiu no seu arquivo `.env`.
-
-- ops: Para cada serviço (api, realtime e worker), o docker espera um arquivo '.env.production' em cada pasta. 
-
-    O script "ci/start.sh" copia do ".env" na raiz do projeto, certifique-se de ter um ".env" válido.
-
------
-
-### Variáveis de Ambiente (.env)
-
-Estas são as variáveis necessárias para o funcionamento da aplicação. Elas devem ser definidas em um arquivo `.env` na raiz do projeto.
-
-
-```properties
-# Configurações da Aplicação
-PORT=3000
-WS_PORT=443
-REDIS_PORT=6379
-
-# Banco de Dados (API e Docker)
-DATABASE_URL="postgresql://user:password@localhost:5432/dbname?schema=public"
-POSTGRES_USER=user
-POSTGRES_PASSWORD=password
-POSTGRES_DB=dbname
-
-# Chaves de Segurança
-ENCRYPT_CORE_KEY=sua-chave-secreta-para-criptografia
-BLIND_KEY=sua-chave-secreta-para-hmac
-JWT_KEY=sua-chave-secreta-para-jwt
-
-# Configurações da AWS S3
-BUCKET_NAME=nome-do-seu-bucket
-AWS_ACCESS_KEY_ID=seu-access-key-id
-AWS_SECRET_ACCESS_KEY=seu-secret-access-key
-AWS_REGION=us-east-1
+```text
+api/        API HTTP, regras de negócio, banco, arquivos e migrações
+realtime/   Socket.IO, autenticação de conexões e eventos de chat/notificação
+worker/     início de consumidor de fila Redis, ainda sem processamento útil
+ci/         atalho para iniciar a demo com Docker Compose
+docker-compose.yaml
+            ambiente local de demonstração (Docker Compose)
+docs/       documentação de arquitetura e estado conhecido
 ```
 
-## 🤝 Como Contribuir
+## Como explorar
 
-Contribuições são o que tornam a comunidade de código aberto um lugar incrível para aprender, inspirar e criar. Qualquer contribuição que você fizer será **muito apreciada**.
+Para subir o ambiente local com Docker Compose, copie o exemplo de variáveis e inicie os serviços:
 
-1.  Faça um **Fork** do projeto.
-2.  Crie uma nova Branch (`git checkout -b feature/sua-feature`).
-3.  Faça o **Commit** das suas alterações (`git commit -m '...'`).
-4.  Faça o **Push** da Branch (`git push origin feature/sua-feature`).
-5.  Abra um **Pull Request**.
+```sh
+cp .env.example .env
+docker compose up --build
+```
 
-## Sobre o Projeto
+Como alternativa, `bash ci/start.sh` executa o mesmo comando. Passe `-d` ao script para iniciar em segundo plano.
+
+Quando a API iniciar, as migrações do PostgreSQL são aplicadas automaticamente. A documentação OpenAPI fica em `http://localhost:3000/openapi` e o endpoint de saúde em `http://localhost:3000/ping`. O serviço Socket.IO fica na porta `3300`.
+
+Para iniciar em segundo plano, use `docker compose up --build -d`; para acompanhar a saída, `docker compose logs -f`; para parar os serviços, `docker compose down`. Os dados do PostgreSQL ficam em um volume Docker e são preservados ao parar os containers. O projeto foi validado para o ambiende de produção como uma demonstração.
+
+Os pacotes são independentes e cada serviço possui seu próprio `package.json` e lockfile do Bun. O procedimento acima cobre o ambiente de demonstração local; consulte [ARQUITETURA.md](docs/ARQUITETURA.md) para conhecer os requisitos de S3 e as limitações antes de avaliar outros cenários.
+
+## Documentação
+
+- [Arquitetura, fluxos, módulos e problemas conhecidos](docs/ARQUITETURA.md)
+
+## Créditos
 
 EQUIPE: André de Oliveira, Arthur Rolemberg, Beatriz Bezerra,
 Eduardo Rossi e Gabriel Durbano.
 
 DESENVOLVEDORES:
 
-- André Dias [@https-dre](https://github.com/https-dre)
-- Arthur Rolemberg [@Massivo5040](https://github.com/Massivo5040)
+- André Dias [@https-dre](https://github.com/dias-andre)
+- Arthur Rolemberg Desenvolvedor Front-End
 
 ORIENTADORA: Nathane De Castro.
 
