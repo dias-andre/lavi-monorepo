@@ -63,41 +63,48 @@ Ao criar um pedido, a API salva o pedido e seus itens e publica o payload no can
 
 Há também um provedor de fila que faz `RPUSH`, enquanto o consumidor rascunhado usa `BLPOP`. Esse caminho não corresponde ao fluxo de pedidos (que usa Pub/Sub) e ainda não tem tarefa concluída.
 
-## Executar ou desenvolver
+## Executar localmente com Podman
 
-Não há, no estado atual, um procedimento Docker confiável de ponta a ponta. Para trabalho local, as dependências externas esperadas são PostgreSQL, Redis e credenciais/configuração de S3, além do Bun. Cada serviço contém scripts `dev` e `start`, mas iniciar os processos exige preparar cada diretório, configurar variáveis próprias e garantir conectividade entre serviços.
+O Compose principal agora descreve um ambiente local de demonstração com PostgreSQL, Redis, API e realtime. O worker não é iniciado porque ainda não processa tarefas. Com Podman e `podman-compose` instalados:
+
+```sh
+cp .env.example .env
+podman-compose up --build
+```
+
+O primeiro início constrói as imagens e a API aplica as migrações do Drizzle antes de iniciar o servidor. A API responde em `http://localhost:3000`; OpenAPI fica em `/openapi` e a verificação simples em `/ping`. O Socket.IO escuta na porta `3300`. Para executar em segundo plano, acrescente `-d`; `podman-compose logs -f` acompanha os logs e `podman-compose down` para os containers. O volume `lavi_postgres_data` mantém o banco entre reinícios.
+
+O ambiente usa chaves e credenciais locais de exemplo e não é adequado para produção. Os fluxos de upload de arquivos precisam de credenciais AWS válidas e de um bucket S3 existente; os valores placeholder só permitem que os serviços iniciem. A composição local não tenta imitar o S3.
+
+Não há Compose de produção mantido; o workflow antigo de deploy não é coberto por estas instruções. Para executar processos fora dos containers, cada pacote tem scripts `dev` e `start`, mas será necessário fornecer as mesmas dependências e variáveis descritas abaixo.
 
 Variáveis observadas no código:
 
 | Serviço | Variáveis usadas ou validadas |
 | --- | --- |
 | API | `DATABASE_URL`, `ENCRYPT_CORE_KEY`, `BLIND_KEY`, `JWT_KEY`, `BUCKET_NAME`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`, `REDIS_HOST`, `REDIS_PORT`, `PORT`, `NODE_ENV` |
-| Realtime | `API_ADDR`, `WS_PORT`, `REDIS_HOST`, `REDIS_PORT`, `DATABASE_URL`, `NODE_ENV` |
+| Realtime | `API_ADDR` (URL completa), `WS_PORT`, `REDIS_HOST`, `REDIS_PORT`, `DATABASE_URL`, `NODE_ENV` |
 | Worker | `REDIS_HOST`, `REDIS_PORT`, `NODE_ENV` (o consumidor não é iniciado pelo entrypoint atual) |
 
-As validações de ambiente não são completas nem iguais entre os serviços. O realtime valida `API_ADDR` como hostname, enquanto o Compose fornece um valor com protocolo (`http://api`); isso pode causar rejeição na validação. A API usa `REDIS_PORT` em tempo de execução, embora seu schema de validação não o exija. As conexões de banco também são construídas em realtime mesmo que `DATABASE_URL` não esteja no schema de validação dele.
+As validações de ambiente não são completas nem iguais entre os serviços. A API usa `REDIS_PORT` em tempo de execução, embora seu schema de validação não o exija. As conexões de banco também são construídas em realtime mesmo que `DATABASE_URL` não esteja no schema de validação dele. O Compose local fornece explicitamente essas variáveis.
 
 ## Problemas conhecidos no repositório
 
 Estes itens podem impedir execução ou causar comportamento inesperado; não são uma auditoria exaustiva.
 
-1. **Compose sem banco no conjunto base/produção.** `docker-compose.yaml` define Redis e aplicações, mas não PostgreSQL. O serviço `database` aparece apenas em `docker-compose.dev.yaml`, não no Compose de produção.
-2. **Rede do banco em desenvolvimento.** O Compose base conecta API/Realtime à rede `lavi_backend`; o serviço `database` no overlay de desenvolvimento não declara essa rede. O host `database` pode não ser alcançável pelos serviços da aplicação.
-3. **Porta Redis possivelmente incompatível.** O Redis da imagem usa 6379 por padrão, mas o overlay publica `${REDIS_PORT}:${REDIS_PORT}` sem configurar a porta interna do Redis. Valores diferentes de 6379 podem falhar.
-4. **Ambiente e script de inicialização desalinhados.** `ci/setup.sh` copia o mesmo `.env` da raiz para três arquivos. O código e os Compose esperam configurações distintas; o exemplo antigo do README não documentava todas elas.
-5. **Endereço do realtime.** O Compose define `API_ADDR=http://api`, mas o schema de validação do serviço declara `API_ADDR` como `idn-hostname`, sem protocolo.
-6. **Worker sem trabalho conectado.** O entrypoint não executa consumidor e a função de processamento existente é só ilustrativa.
-7. **Eventos de socket sem autorização suficiente demonstrada.** Eventos de notificação global estão registrados no servidor. Revise identidade, autorização e limites de emissão antes de uso público.
-8. **Cluster da API não supervisiona workers.** O modo cluster cria um processo por CPU, sem lógica visível de substituição/encerramento coordenado; isso merece revisão operacional.
-9. **CI/CD aparentemente obsoleto.** `.github/workflows/deploy.yml` usa caminhos/nome de projeto que não combinam claramente com este repositório, e depende de scripts remotos e segredos externos.
-10. **Cobertura de testes reduzida.** Os testes presentes verificam principalmente ping e cadastro básico de cliente; não dão segurança sobre permissões, pedidos, pagamentos, mídia ou operação distribuída.
-11. **Permissões incompletas em rotas HTTP.** O validador de sessão do cliente é montado apenas antes de um subconjunto de rotas de cliente. Rotas de cadastro de membro, criação de notificações, consultas de chat e diversos recursos de lavanderia/pedido são montados sem um guard visível. Onde o guard existe, o código valida o token, mas os handlers ainda aceitam IDs vindos da URL sem comparar explicitamente com a identidade do token. Isso pode permitir acesso cruzado entre contas.
-12. **Upload de imagem de lavanderia atualiza o repositório errado.** `MediaService.uploadLaundryProfileImage` encontra a lavanderia, mas persiste o `profile_url` via `customerRepository.update`; a imagem pode ir para o S3 sem atualizar a lavanderia corretamente.
-13. **Validação de imagens de avaliação parece invertida.** `MediaService.uploadFeedbackImages` lança “Feedback não encontrado” quando `findById` retorna um registro existente; o caminho normal de upload pode rejeitar avaliações válidas e aceitar IDs inexistentes até a inserção.
-14. **Notificação de membro usa o fluxo de cliente.** A rota `/members/:memberId/notifications` chama `createCustomerNotification`, que procura o ID na tabela de clientes e grava `userType: "customer"`. O método de serviço próprio para membro existe, mas essa rota não o utiliza.
-15. **Exclusão de banner deixa registro persistido.** A rotina apaga o objeto do S3, mas não remove a linha correspondente da tabela de banners. A listagem pode continuar retornando um banner cujo arquivo já foi removido.
-16. **Expiração do JWT longa.** `JwtProvider` emite tokens com validade de um ano. Isso amplia o impacto de uma credencial vazada e deve ser revisto junto com revogação e renovação de sessão.
-17. **Consulta de mensagens não exige identidade visível.** `GET /messages/:chat_id` retorna mensagens pelo ID da conversa sem um controle de autorização no handler. Dados de conversa devem ser tratados como privados.
+1. **Não há composição de produção.** O Compose disponível é somente para a demo local, com credenciais e defaults de desenvolvimento. O workflow de deploy antigo não deve ser tratado como caminho de produção funcional.
+2. **Worker sem trabalho conectado.** O entrypoint não executa consumidor e a função de processamento existente é só ilustrativa.
+3. **Eventos de socket sem autorização suficiente demonstrada.** Eventos de notificação global estão registrados no servidor. Revise identidade, autorização e limites de emissão antes de uso público.
+4. **Cluster da API não supervisiona workers.** O modo cluster cria um processo por CPU, sem lógica visível de substituição/encerramento coordenado; isso merece revisão operacional.
+5. **CI/CD aparentemente obsoleto.** `.github/workflows/deploy.yml` usa caminhos/nome de projeto que não combinam claramente com este repositório, e depende de scripts remotos e segredos externos.
+6. **Cobertura de testes reduzida.** Os testes presentes verificam principalmente ping e cadastro básico de cliente; não dão segurança sobre permissões, pedidos, pagamentos, mídia ou operação distribuída.
+7. **Permissões incompletas em rotas HTTP.** O validador de sessão do cliente é montado apenas antes de um subconjunto de rotas de cliente. Rotas de cadastro de membro, criação de notificações, consultas de chat e diversos recursos de lavanderia/pedido são montados sem um guard visível. Onde o guard existe, o código valida o token, mas os handlers ainda aceitam IDs vindos da URL sem comparar explicitamente com a identidade do token. Isso pode permitir acesso cruzado entre contas.
+8. **Upload de imagem de lavanderia atualiza o repositório errado.** `MediaService.uploadLaundryProfileImage` encontra a lavanderia, mas persiste o `profile_url` via `customerRepository.update`; a imagem pode ir para o S3 sem atualizar a lavanderia corretamente.
+9. **Validação de imagens de avaliação parece invertida.** `MediaService.uploadFeedbackImages` lança “Feedback não encontrado” quando `findById` retorna um registro existente; o caminho normal de upload pode rejeitar avaliações válidas e aceitar IDs inexistentes até a inserção.
+10. **Notificação de membro usa o fluxo de cliente.** A rota `/members/:memberId/notifications` chama `createCustomerNotification`, que procura o ID na tabela de clientes e grava `userType: "customer"`. O método de serviço próprio para membro existe, mas essa rota não o utiliza.
+11. **Exclusão de banner deixa registro persistido.** A rotina apaga o objeto do S3, mas não remove a linha correspondente da tabela de banners. A listagem pode continuar retornando um banner cujo arquivo já foi removido.
+12. **Expiração do JWT longa.** `JwtProvider` emite tokens com validade de um ano. Isso amplia o impacto de uma credencial vazada e deve ser revisto junto com revogação e renovação de sessão.
+13. **Consulta de mensagens não exige identidade visível.** `GET /messages/:chat_id` retorna mensagens pelo ID da conversa sem um controle de autorização no handler. Dados de conversa devem ser tratados como privados.
 
 ## Testes
 
