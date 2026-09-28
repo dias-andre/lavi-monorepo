@@ -8,7 +8,7 @@
 
 ![Maintainer](https://img.shields.io/badge/maintainer-https--dre-blue)
 
-> **Projeto arquivado.** Este repositório foi desenvolvido como trabalho de conclusão de curso e não recebe manutenção regular. O código contém bugs e lacunas conhecidos; não considere o sistema pronto para produção nem use dados ou credenciais reais sem uma revisão técnica e de segurança.
+> **Projeto arquivado.** Este repositório foi desenvolvido como o back-end de meu trabalho de conclusão de curso e não recebe manutenção regular. O código atual foi utilizado como parte de uma demonstração e contém bugs e lacunas conhecidos; não considere o sistema pronto para produção real nem use dados ou credenciais reais sem uma revisão técnica e de segurança.
 
 ## Sobre o projeto
 
