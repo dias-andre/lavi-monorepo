@@ -4,4 +4,5 @@ dist/
 .env*
 .flaskenv*
 !.env.project
+!.env.example
 .env.vault

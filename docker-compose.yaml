@@ -1,63 +1,86 @@
 services:
+  database:
+    image: docker.io/library/postgres:16
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-lavi}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-lavi_dev_only}
+      POSTGRES_DB: ${POSTGRES_DB:-lavi}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-lavi} -d ${POSTGRES_DB:-lavi}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    volumes:
+      - lavi_postgres_data:/var/lib/postgresql/data
+    networks:
+      - lavi_backend
+
   redis:
-    image: redis:7
-    container_name: lavi-redis
+    image: docker.io/library/redis:7-alpine
+    ports:
+      - "${REDIS_HOST_PORT:-6379}:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 3s
-      retries: 5
+      retries: 10
     networks:
       - lavi_backend
 
   api:
-    container_name: lavi-api
     build:
       context: ./api
     environment:
-      - REDIS_HOST=redis
-      - REDIS_PORT=${REDIS_PORT}
+      NODE_ENV: development
+      PORT: ${PORT:-3000}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-lavi}:${POSTGRES_PASSWORD:-lavi_dev_only}@database:5432/${POSTGRES_DB:-lavi}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      ENCRYPT_CORE_KEY: ${ENCRYPT_CORE_KEY:-local-development-encryption-key}
+      BLIND_KEY: ${BLIND_KEY:-local-development-blind-key}
+      JWT_KEY: ${JWT_KEY:-local-development-jwt-key}
+      BUCKET_NAME: ${BUCKET_NAME:-lavi-local}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-local-placeholder}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-local-placeholder}
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+    ports:
+      - "${PORT:-3000}:${PORT:-3000}"
     depends_on:
+      database:
+        condition: service_healthy
       redis:
         condition: service_healthy
+    command: ["sh", "-c", "bun run db:migrate && bun run start"]
     networks:
       - lavi_backend
 
   realtime:
-    container_name: lavi-realtime
     build:
       context: ./realtime
     environment:
-      - API_ADDR=http://api
-      - REDIS_HOST=redis
-      - REDIS_PORT=${REDIS_PORT}
+      NODE_ENV: production
+      API_ADDR: http://api:${PORT:-3000}
+      WS_PORT: ${WS_PORT:-3300}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      DATABASE_URL: postgresql://${POSTGRES_USER:-lavi}:${POSTGRES_PASSWORD:-lavi_dev_only}@database:5432/${POSTGRES_DB:-lavi}
+    ports:
+      - "${WS_PORT:-3300}:${WS_PORT:-3300}"
     depends_on:
       api:
         condition: service_started
+      database:
+        condition: service_healthy
       redis:
         condition: service_healthy
     networks:
       - lavi_backend
 
-  worker:
-    container_name: lavi-worker
-    build:
-      context: ./worker/
-    environment:
-      - REDIS_HOST=redis
-      - REDIS_PORT=${REDIS_PORT}
-      - WS_ADDR=realtime
-      - WS_PORT=${WS_PORT}
-    depends_on:
-      redis:
-        condition: service_healthy
-      realtime:
-        condition: service_started
-
 volumes:
-  lavi_data:
+  lavi_postgres_data:
 
 networks:
   lavi_backend:
-    name: lavi_backend
     driver: bridge
