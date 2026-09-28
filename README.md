@@ -8,84 +8,48 @@
 
 ![Maintainer](https://img.shields.io/badge/maintainer-https--dre-blue)
 
-## Sobre o Projeto
+> **Projeto arquivado.** Este repositório foi desenvolvido como trabalho de conclusão de curso e não recebe manutenção regular. O código contém bugs e lacunas conhecidos; não considere o sistema pronto para produção nem use dados ou credenciais reais sem uma revisão técnica e de segurança.
 
-A **Laví API** é o backend responsável por gerenciar os workflows e as regras de negócio do aplicativo "Laví". Construída com foco em performance e escalabilidade, utilizando um stack moderno com Elysia, Bun e TypeScript.
+## Sobre o projeto
 
-### Pré-requisitos
+A **Laví API** é o backend de uma plataforma de lavanderias. O repositório é um monorepo com uma API HTTP, um serviço de comunicação em tempo real e um worker planejado. A API reúne fluxos de clientes, lavanderias, pedidos, catálogo, avaliações, notificações e conversas.
 
-Antes de começar, você vai precisar ter as seguintes ferramentas instaladas:
+O código usa Bun e TypeScript. A API HTTP foi construída com Elysia e Drizzle ORM, com PostgreSQL para persistência, Redis para eventos e filas e AWS S3 para arquivos. O serviço em tempo real usa Socket.IO.
 
-  * [Bun](https://bun.sh/) (v1.2 ou superior)
-  * [Docker](https://www.docker.com/get-started) e [Docker Compose](https://docs.docker.com/compose/install/)
+## Estado atual e limitações
 
-## Instalação
+- A API tem implementação para os principais módulos do domínio, mas há poucos testes automatizados no repositório e eles não cobrem os fluxos completos.
+- `worker` ainda é um scaffold: seu ponto de entrada só imprime uma mensagem. Existe um consumidor Redis separado, mas não é iniciado pelo ponto de entrada e sua tarefa atual é apenas ilustrativa.
+- A configuração Docker está incompleta para execução independente. O Compose base não declara PostgreSQL; a composição de desenvolvimento adiciona um banco, mas ele não está ligado à rede customizada dos serviços da aplicação. A configuração de produção também não inclui banco de dados.
+- Há diferenças entre os exemplos antigos de variáveis, as validações dos serviços e as variáveis necessárias em tempo de execução. O script de inicialização copia um único `.env` para os três serviços, apesar de cada um esperar configurações diferentes.
+- A action de deploy parece ter caminhos e nomes de repositório antigos e não deve ser considerada uma implantação funcional sem revisão.
+- A autenticação e as permissões devem ser auditadas. Algumas rotas são montadas antes do validador de sessão, e eventos do Socket.IO incluem eventos de notificação sem controle de autorização demonstrado no código.
 
-1.  **Clone o repositório:**
+Esses pontos são um retrato do código encontrado, não uma lista exaustiva de defeitos. Consulte [a documentação da arquitetura e operação](docs/ARQUITETURA.md) para detalhes e para entender cada parte do monorepo.
 
-    ```sh
-    git clone https://github.com/laundry-lavi/lavi-api.git
-    cd lavi-api
-    ```
+## Estrutura do repositório
 
-### Executando a Aplicação
-
-1.  **Iniciar a aplicação com suas dependências**
-
-    Este comando executa a criação dos containers em modo de produção, copiando as variáveis do arquivo '.env'
-
-    ```sh
-    bash ci/start.sh
-    ```
-
-A API estará disponível em `http://localhost:{PORT}`, onde `{PORT}` é a porta que você definiu no seu arquivo `.env`.
-
-- ops: Para cada serviço (api, realtime e worker), o docker espera um arquivo '.env.production' em cada pasta. 
-
-    O script "ci/start.sh" copia do ".env" na raiz do projeto, certifique-se de ter um ".env" válido.
-
------
-
-### Variáveis de Ambiente (.env)
-
-Estas são as variáveis necessárias para o funcionamento da aplicação. Elas devem ser definidas em um arquivo `.env` na raiz do projeto.
-
-
-```properties
-# Configurações da Aplicação
-PORT=3000
-WS_PORT=443
-REDIS_PORT=6379
-
-# Banco de Dados (API e Docker)
-DATABASE_URL="postgresql://user:password@localhost:5432/dbname?schema=public"
-POSTGRES_USER=user
-POSTGRES_PASSWORD=password
-POSTGRES_DB=dbname
-
-# Chaves de Segurança
-ENCRYPT_CORE_KEY=sua-chave-secreta-para-criptografia
-BLIND_KEY=sua-chave-secreta-para-hmac
-JWT_KEY=sua-chave-secreta-para-jwt
-
-# Configurações da AWS S3
-BUCKET_NAME=nome-do-seu-bucket
-AWS_ACCESS_KEY_ID=seu-access-key-id
-AWS_SECRET_ACCESS_KEY=seu-secret-access-key
-AWS_REGION=us-east-1
+```text
+api/        API HTTP, regras de negócio, banco, arquivos e migrações
+realtime/   Socket.IO, autenticação de conexões e eventos de chat/notificação
+worker/     início de consumidor de fila Redis, ainda sem processamento útil
+ci/         scripts simples de preparação e inicialização Docker
+docker-compose*.yaml
+            composições base, desenvolvimento e produção
+docs/       documentação de arquitetura e estado conhecido
 ```
 
-## 🤝 Como Contribuir
+## Como explorar
 
-Contribuições são o que tornam a comunidade de código aberto um lugar incrível para aprender, inspirar e criar. Qualquer contribuição que você fizer será **muito apreciada**.
+Para consultar endpoints e modelos em uma instância já configurada, a API expõe documentação OpenAPI em `/openapi` e um endpoint de saúde simples em `/ping`. Isso não significa que a configuração Docker atual funcione sem ajustes.
 
-1.  Faça um **Fork** do projeto.
-2.  Crie uma nova Branch (`git checkout -b feature/sua-feature`).
-3.  Faça o **Commit** das suas alterações (`git commit -m '...'`).
-4.  Faça o **Push** da Branch (`git push origin feature/sua-feature`).
-5.  Abra um **Pull Request**.
+Os pacotes são independentes e cada serviço possui seu próprio `package.json` e lockfile do Bun. Antes de tentar executar o projeto, revise [ARQUITETURA.md](docs/ARQUITETURA.md), em especial os requisitos de ambiente e os problemas conhecidos de Compose. Não há uma receita de inicialização garantida neste estado arquivado.
 
-## Sobre o Projeto
+## Documentação
+
+- [Arquitetura, fluxos, módulos e problemas conhecidos](docs/ARQUITETURA.md)
+
+## Créditos
 
 EQUIPE: André de Oliveira, Arthur Rolemberg, Beatriz Bezerra,
 Eduardo Rossi e Gabriel Durbano.
