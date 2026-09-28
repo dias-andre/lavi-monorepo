@@ -23,7 +23,6 @@ O código usa Bun e TypeScript. A API HTTP foi construída com Elysia e Drizzle 
 - A configuração local de Docker Compose prepara API, realtime, PostgreSQL, Redis e migrações com valores de desenvolvimento. Não há uma composição de produção mantida; o workflow antigo de deploy precisa de revisão.
 - Recursos de upload para S3 não funcionam com os placeholders locais: precisam de credenciais AWS e bucket configurado.
 - A action de deploy parece ter caminhos e nomes de repositório antigos e não deve ser considerada uma implantação funcional sem revisão.
-- A autenticação e as permissões devem ser auditadas. Algumas rotas são montadas antes do validador de sessão, e eventos do Socket.IO incluem eventos de notificação sem controle de autorização demonstrado no código.
 
 Esses pontos são um retrato do código encontrado, não uma lista exaustiva de defeitos. Consulte [a documentação da arquitetura e operação](docs/ARQUITETURA.md) para detalhes e para entender cada parte do monorepo.
 
@@ -52,7 +51,7 @@ Como alternativa, `bash ci/start.sh` executa o mesmo comando. Passe `-d` ao scri
 
 Quando a API iniciar, as migrações do PostgreSQL são aplicadas automaticamente. A documentação OpenAPI fica em `http://localhost:3000/openapi` e o endpoint de saúde em `http://localhost:3000/ping`. O serviço Socket.IO fica na porta `3300`.
 
-Para iniciar em segundo plano, use `docker compose up --build -d`; para acompanhar a saída, `docker compose logs -f`; para parar os serviços, `docker compose down`. Os dados do PostgreSQL ficam em um volume Docker e são preservados ao parar os containers. O projeto não foi validado para produção.
+Para iniciar em segundo plano, use `docker compose up --build -d`; para acompanhar a saída, `docker compose logs -f`; para parar os serviços, `docker compose down`. Os dados do PostgreSQL ficam em um volume Docker e são preservados ao parar os containers. O projeto foi validado para o ambiende de produção como uma demonstração.
 
 Os pacotes são independentes e cada serviço possui seu próprio `package.json` e lockfile do Bun. O procedimento acima cobre o ambiente de demonstração local; consulte [ARQUITETURA.md](docs/ARQUITETURA.md) para conhecer os requisitos de S3 e as limitações antes de avaliar outros cenários.
 
@@ -67,8 +66,8 @@ Eduardo Rossi e Gabriel Durbano.
 
 DESENVOLVEDORES:
 
-- André Dias [@https-dre](https://github.com/https-dre)
-- Arthur Rolemberg [@Massivo5040](https://github.com/Massivo5040)
+- André Dias [@https-dre](https://github.com/dias-andre)
+- Arthur Rolemberg Desenvolvedor Front-End
 
 ORIENTADORA: Nathane De Castro.
 

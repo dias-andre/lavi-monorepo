@@ -1,6 +1,6 @@
 # Arquitetura e funcionamento
 
-Este documento descreve o que está implementado neste repositório e o que ainda parece incompleto. O projeto é um backend acadêmico arquivado; nomes de rotas e fluxos podem mudar caso o código seja retomado.
+Este documento descreve o que está implementado neste repositório e o que ainda parece incompleto. O projeto o um back-end de um projeto acadêmico arquivado; nomes de rotas e fluxos podem mudar caso o código seja retomado.
 
 ## Visão geral
 
